@@ -1,0 +1,35 @@
+# ==============================================================================
+# .gitignore — SAE 3.1 Touiteur.app
+# ==============================================================================
+
+# Dossiers internes contenant les scripts .bat, documentation et archives hors projet
+Autre/
+kit_deploiement/
+Projet_Mercredi/
+
+# Fichiers système et éditeurs
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Fichiers temporaires, logs et archives
+*.log
+*.tmp
+*.zip
+
+# Tunnel zrok et fichiers temporaires de partage
+.zrok/
+.zrok*
+zrok*
+*.zrok
+
+# Base de données locale de travail (SQLite) générée à l'exécution
+/bd/*.sqlite
+!/bd/seed_sqlite.sql
+
+# Dossier d'uploads (conserver uniquement le dossier et images de démonstration)
+/public/uploads/*
+!/public/uploads/.gitkeep
+!/public/uploads/demo_architecture.png
+!/public/uploads/demo_cyber.png
