@@ -25,34 +25,56 @@ Le developpement s'appuie sur une demarche stricte en PHP Objet, sans framework 
 
 ---
 
-## Organisation du developpement
+## Avancement du projet (Semaine 1 - Base de donnees & Modeles)
 
-Le projet se deroule sur deux semaines :
-- **Semaine 1 (30h PHP & Base de donnees) :**
-  - Conception de la base de donnees (schemas relationnels Oracle/MySQL, triggers PL/SQL, rapport de conception relationnelle).
-  - Modeles metier (User, Touite, Tag, Image) et hierarchie des exceptions.
-  - Couche d'acces aux donnees (ConnectionFactory singleton PDO, Repository avec methodes F1 a F15).
-  - Tests automatises CLI validant le backend.
-- **Semaine 2 (6h Web Front-end) :**
-  - Dispatcher frontal et controleurs Single Action.
-  - Moteurs de rendu HTML securises anti-XSS.
-  - Back-office d'administration independant (influenceurs et tendances).
-  - Ergonomie, CSS responsive et finalisation.
+Les elements suivants sont mis en place :
+1. **Base de donnees relationnelle** :
+   - Schéma relationnel DDL Oracle Database (`bd/oracle_schema.sql`)
+   - Déclencheurs PL/SQL Oracle (`bd/oracle_triggers.sql`)
+   - Schéma relationnel MySQL / SQLite (`bd/mysql_schema.sql`, `bd/seed_sqlite.sql`)
+   - Données de test riches (`bd/seed_data.sql`)
+   - Rapport de conception relationnelle (`bd/rapport_conception_bd.md`)
+2. **Entites metier** :
+   - `User`, `Touite`, `Tag`, `Image` dans `src/classes/model/`
+3. **Exceptions metier** :
+   - `TouiteurException`, `DatabaseException`, `ValidationException` dans `src/classes/exceptions/`
+4. **Acces aux donnees** :
+   - Fabrique de connexion singleton PDO dans `src/classes/repository/ConnectionFactory.php`
+   - Fichier de configuration dans `config/db.ini`
 
 ---
 
-## Structure initiale du projet
+## Structure actuelle du projet
 
 ```
 SAE_3.1/
+├── bd/
+│   ├── oracle_schema.sql
+│   ├── oracle_triggers.sql
+│   ├── mysql_schema.sql
+│   ├── seed_data.sql
+│   ├── seed_sqlite.sql
+│   └── rapport_conception_bd.md
+├── config/
+│   ├── db.ini.example
+│   └── db.ini
 ├── src/classes/
-│   └── Autoloader.php   # Autoloader conforme PSR-4
+│   ├── Autoloader.php
+│   ├── exceptions/
+│   ├── model/
+│   └── repository/
+│       └── ConnectionFactory.php
 ├── .gitignore
 └── README.md
 ```
 
 ---
 
-## Prerequis
+## Configuration de la base de donnees
 
-- PHP 8.2 ou superieur
+La connexion se configure dans le fichier `config/db.ini` :
+```ini
+driver = sqlite
+database = bd/touiteur.sqlite
+```
+Pour utiliser MySQL ou Oracle, modifier les paramètres correspondants dans `config/db.ini`.
