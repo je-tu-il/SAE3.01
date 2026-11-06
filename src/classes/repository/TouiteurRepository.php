@@ -129,4 +129,80 @@ class TouiteurRepository {
         }
         return $users;
     }
+
+    // =========================================================================
+    // Filtres de recherche par auteur et par tag (Ilyass) - F4 & F5
+    // =========================================================================
+
+    public function getTouitesByUser(string $pseudo, int $page = 1, int $limit = 5): array {
+        $offset = max(0, ($page - 1) * $limit);
+        $sql = "SELECT t.id_touite, t.texte, t.date_publication, t.note, t.id_auteur, t.id_image,
+                       u.pseudo AS auteur_pseudo,
+                       img.chemin AS image_chemin, img.description AS image_desc
+                FROM TOUITE t
+                INNER JOIN UTILISATEUR u ON t.id_auteur = u.id_user
+                LEFT JOIN IMAGE img ON t.id_image = img.id_img
+                WHERE u.pseudo = :pseudo
+                ORDER BY t.date_publication DESC
+                LIMIT :limit OFFSET :offset";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(':pseudo', $pseudo, PDO::PARAM_STR);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $touites = [];
+        while ($row = $stmt->fetch()) {
+            $touites[] = $this->hydrateTouite($row);
+        }
+        return $touites;
+    }
+
+    public function countTouitesByUser(string $pseudo): int {
+        $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM TOUITE t INNER JOIN UTILISATEUR u ON t.id_auteur = u.id_user WHERE u.pseudo = :pseudo");
+        $stmt->execute([':pseudo' => $pseudo]);
+        return (int)$stmt->fetchColumn();
+    }
+
+    public function getTouitesByTag(string $tagLibelle, int $page = 1, int $limit = 5): array {
+        $offset = max(0, ($page - 1) * $limit);
+        $cleanTag = ltrim($tagLibelle, '#');
+
+        $sql = "SELECT t.id_touite, t.texte, t.date_publication, t.note, t.id_auteur, t.id_image,
+                       u.pseudo AS auteur_pseudo,
+                       img.chemin AS image_chemin, img.description AS image_desc
+                FROM TOUITE t
+                INNER JOIN UTILISATEUR u ON t.id_auteur = u.id_user
+                INNER JOIN TOUITE_TAG tt ON t.id_touite = tt.id_touite
+                INNER JOIN TAG tag ON tt.id_tag = tag.id_tag
+                LEFT JOIN IMAGE img ON t.id_image = img.id_img
+                WHERE tag.libelle = :tag
+                ORDER BY t.date_publication DESC
+                LIMIT :limit OFFSET :offset";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(':tag', $cleanTag, PDO::PARAM_STR);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $touites = [];
+        while ($row = $stmt->fetch()) {
+            $touites[] = $this->hydrateTouite($row);
+        }
+        return $touites;
+    }
+
+    public function countTouitesByTag(string $tagLibelle): int {
+        $cleanTag = ltrim($tagLibelle, '#');
+        $sql = "SELECT COUNT(*) 
+                FROM TOUITE t
+                INNER JOIN TOUITE_TAG tt ON t.id_touite = tt.id_touite
+                INNER JOIN TAG tag ON tt.id_tag = tag.id_tag
+                WHERE tag.libelle = :tag";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':tag' => $cleanTag]);
+        return (int)$stmt->fetchColumn();
+    }
 }
