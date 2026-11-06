@@ -332,4 +332,121 @@ class TouiteurRepository {
         $val = $stmt->fetchColumn();
         return ($val !== false) ? (int)$val : null;
     }
+
+    // =========================================================================
+    // Abonnements et Mur personnel (Marin) - F9, F10 & F11
+    // =========================================================================
+
+    public function followUser(string $followerPseudo, string $targetPseudo): bool {
+        if (strcasecmp($followerPseudo, $targetPseudo) === 0) {
+            throw new ValidationException("Vous ne pouvez pas vous suivre vous-mÃªme.");
+        }
+        $follower = $this->getUserByPseudo($followerPseudo);
+        $target = $this->getUserByPseudo($targetPseudo);
+        if (!$follower || !$target) {
+            throw new ValidationException("Utilisateur introuvable.");
+        }
+        $stmt = $this->pdo->prepare("INSERT OR IGNORE INTO SUIVRE_UTILISATEUR (id_suiveur, id_suivi) VALUES (:f, :t)");
+        return $stmt->execute([':f' => $follower->getId(), ':t' => $target->getId()]);
+    }
+
+    public function unfollowUser(string $followerPseudo, string $targetPseudo): bool {
+        $follower = $this->getUserByPseudo($followerPseudo);
+        $target = $this->getUserByPseudo($targetPseudo);
+        if (!$follower || !$target) return false;
+        $stmt = $this->pdo->prepare("DELETE FROM SUIVRE_UTILISATEUR WHERE id_suiveur = :f AND id_suivi = :t");
+        return $stmt->execute([':f' => $follower->getId(), ':t' => $target->getId()]);
+    }
+
+    public function isFollowingUser(string $followerPseudo, string $targetPseudo): bool {
+        $follower = $this->getUserByPseudo($followerPseudo);
+        $target = $this->getUserByPseudo($targetPseudo);
+        if (!$follower || !$target) return false;
+        $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM SUIVRE_UTILISATEUR WHERE id_suiveur = :f AND id_suivi = :t");
+        $stmt->execute([':f' => $follower->getId(), ':t' => $target->getId()]);
+        return ((int)$stmt->fetchColumn()) > 0;
+    }
+
+    public function followTag(string $pseudo, string $tagLibelle): bool {
+        $user = $this->getUserByPseudo($pseudo);
+        if (!$user) throw new ValidationException("Utilisateur introuvable.");
+        $tagId = $this->findOrCreateTag($tagLibelle);
+        $stmt = $this->pdo->prepare("INSERT OR IGNORE INTO SUIVRE_TAG (id_user, id_tag) VALUES (:u, :t)");
+        return $stmt->execute([':u' => $user->getId(), ':t' => $tagId]);
+    }
+
+    public function unfollowTag(string $pseudo, string $tagLibelle): bool {
+        $user = $this->getUserByPseudo($pseudo);
+        if (!$user) return false;
+        $clean = ltrim(trim($tagLibelle), '#');
+        $stmtTag = $this->pdo->prepare("SELECT id_tag FROM TAG WHERE libelle = :lib");
+        $stmtTag->execute([':lib' => $clean]);
+        $tagId = $stmtTag->fetchColumn();
+        if (!$tagId) return false;
+        $stmt = $this->pdo->prepare("DELETE FROM SUIVRE_TAG WHERE id_user = :u AND id_tag = :t");
+        return $stmt->execute([':u' => $user->getId(), ':t' => $tagId]);
+    }
+
+    public function isFollowingTag(string $pseudo, string $tagLibelle): bool {
+        $user = $this->getUserByPseudo($pseudo);
+        if (!$user) return false;
+        $clean = ltrim(trim($tagLibelle), '#');
+        $sql = "SELECT COUNT(*) FROM SUIVRE_TAG st INNER JOIN TAG t ON st.id_tag = t.id_tag WHERE st.id_user = :u AND t.libelle = :lib";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':u' => $user->getId(), ':lib' => $clean]);
+        return ((int)$stmt->fetchColumn()) > 0;
+    }
+
+    public function getUserFollowedTags(string $pseudo): array {
+        $user = $this->getUserByPseudo($pseudo);
+        if (!$user) return [];
+        $sql = "SELECT t.libelle FROM TAG t INNER JOIN SUIVRE_TAG st ON t.id_tag = st.id_tag WHERE st.id_user = :u ORDER BY t.libelle ASC";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':u' => $user->getId()]);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    }
+
+    public function getUserWallTouites(string $pseudo, int $page = 1, int $limit = 5): array {
+        $user = $this->getUserByPseudo($pseudo);
+        if (!$user) return [];
+        $offset = max(0, ($page - 1) * $limit);
+        $userId = $user->getId();
+
+        $sql = "SELECT DISTINCT t.id_touite, t.texte, t.date_publication, t.note, t.id_auteur, t.id_image,
+                        u.pseudo AS auteur_pseudo,
+                        img.chemin AS image_chemin, img.description AS image_desc
+                 FROM TOUITE t
+                 INNER JOIN UTILISATEUR u ON t.id_auteur = u.id_user
+                 LEFT JOIN IMAGE img ON t.id_image = img.id_img
+                 WHERE t.id_auteur IN (SELECT id_suivi FROM SUIVRE_UTILISATEUR WHERE id_suiveur = :u1)
+                    OR t.id_touite IN (SELECT tt.id_touite FROM TOUITE_TAG tt INNER JOIN SUIVRE_TAG st ON tt.id_tag = st.id_tag WHERE st.id_user = :u2)
+                 ORDER BY t.date_publication DESC
+                 LIMIT :limit OFFSET :offset";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(':u1', $userId, PDO::PARAM_INT);
+        $stmt->bindValue(':u2', $userId, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $touites = [];
+        while ($row = $stmt->fetch()) {
+            $touites[] = $this->hydrateTouite($row);
+        }
+        return $touites;
+    }
+
+    public function countUserWallTouites(string $pseudo): int {
+        $user = $this->getUserByPseudo($pseudo);
+        if (!$user) return 0;
+        $userId = $user->getId();
+        $sql = "SELECT COUNT(DISTINCT t.id_touite)
+                 FROM TOUITE t
+                 WHERE t.id_auteur IN (SELECT id_suivi FROM SUIVRE_UTILISATEUR WHERE id_suiveur = :u1)
+                    OR t.id_touite IN (SELECT tt.id_touite FROM TOUITE_TAG tt INNER JOIN SUIVRE_TAG st ON tt.id_tag = st.id_tag WHERE st.id_user = :u2)";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':u1' => $userId, ':u2' => $userId]);
+        return (int)$stmt->fetchColumn();
+    }
 }
