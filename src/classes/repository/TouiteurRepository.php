@@ -205,4 +205,83 @@ class TouiteurRepository {
         $stmt->execute([':tag' => $cleanTag]);
         return (int)$stmt->fetchColumn();
     }
+
+    // =========================================================================
+    // Publication de touite, tags regex et images (Jules) - F6, F8 & F13
+    // =========================================================================
+
+    public static function extractTags(string $text): array {
+        preg_match_all('/(?<!&)#([\p{L}\p{N}_]+)/u', $text, $matches);
+        if (!empty($matches[1])) {
+            return array_values(array_unique(array_map('trim', $matches[1])));
+        }
+        return [];
+    }
+
+    public function publishTouite(string $pseudo, string $texte, ?string $imageChemin = null, ?string $imageDesc = null): int {
+        $texte = trim($texte);
+        if (empty($texte)) {
+            throw new ValidationException("Le texte du touite ne peut pas Ãªtre vide.");
+        }
+        if (mb_strlen($texte, 'UTF-8') > 235) {
+            throw new ValidationException("Le touite dÃ©passe la limite autorisÃ©e de 235 caractÃ¨res.");
+        }
+
+        $user = $this->getUserByPseudo($pseudo);
+        if (!$user) {
+            $this->createUser($pseudo, $pseudo, 'Utilisateur', $pseudo . '@touiteur.local');
+            $user = $this->getUserByPseudo($pseudo);
+        }
+
+        $idImage = null;
+        if (!empty($imageChemin)) {
+            $stmtImg = $this->pdo->prepare("INSERT INTO IMAGE (chemin, description) VALUES (:ch, :desc)");
+            $stmtImg->execute([
+                ':ch' => $imageChemin,
+                ':desc' => $imageDesc ?: 'Image attachÃ©e au touite'
+            ]);
+            $idImage = (int)$this->pdo->lastInsertId();
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $stmt = $this->pdo->prepare("INSERT INTO TOUITE (texte, date_publication, note, id_auteur, id_image) VALUES (:txt, :dt, 0, :auteur, :img)");
+        $stmt->execute([
+            ':txt' => $texte,
+            ':dt' => $now,
+            ':auteur' => $user->getId(),
+            ':img' => $idImage
+        ]);
+
+        $touiteId = (int)$this->pdo->lastInsertId();
+
+        $tags = self::extractTags($texte);
+        foreach ($tags as $tagLibelle) {
+            $tagId = $this->findOrCreateTag($tagLibelle);
+            $stmtLink = $this->pdo->prepare("INSERT OR IGNORE INTO TOUITE_TAG (id_touite, id_tag) VALUES (:id_t, :id_tag)");
+            $stmtLink->execute([':id_t' => $touiteId, ':id_tag' => $tagId]);
+        }
+
+        $this->pdo->prepare("UPDATE UTILISATEUR SET nb_touites = nb_touites + 1 WHERE id_user = :id")->execute([':id' => $user->getId()]);
+
+        return $touiteId;
+    }
+
+    public function findOrCreateTag(string $libelle): int {
+        $clean = ltrim(trim($libelle), '#');
+        $stmt = $this->pdo->prepare("SELECT id_tag FROM TAG WHERE libelle = :lib");
+        $stmt->execute([':lib' => $clean]);
+        $id = $stmt->fetchColumn();
+        if ($id) return (int)$id;
+
+        $ins = $this->pdo->prepare("INSERT INTO TAG (libelle, description) VALUES (:lib, :desc)");
+        $ins->execute([':lib' => $clean, ':desc' => "Publications sur le thÃ¨me #" . $clean]);
+        return (int)$this->pdo->lastInsertId();
+    }
+
+    public function createUser(string $pseudo, string $prenom, string $nom, string $email): int {
+        $now = date('Y-m-d H:i:s');
+        $stmt = $this->pdo->prepare("INSERT INTO UTILISATEUR (pseudo, nom, prenom, email, nb_touites, date_inscription) VALUES (:p, :n, :pr, :e, 0, :dt)");
+        $stmt->execute([':p' => $pseudo, ':n' => $nom, ':pr' => $prenom, ':e' => $email, ':dt' => $now]);
+        return (int)$this->pdo->lastInsertId();
+    }
 }
