@@ -284,4 +284,52 @@ class TouiteurRepository {
         $stmt->execute([':p' => $pseudo, ':n' => $nom, ':pr' => $prenom, ':e' => $email, ':dt' => $now]);
         return (int)$this->pdo->lastInsertId();
     }
+
+    // =========================================================================
+    // Ã‰valuations (+1 Like / -1 Dislike avec unicitÃ©) - Antho - F7
+    // =========================================================================
+
+    public function rateTouite(int $touiteId, string $pseudo, int $valeur): array {
+        if (!in_array($valeur, [-1, 1], true)) {
+            throw new ValidationException("La note d'Ã©valuation doit Ãªtre de +1 ou -1.");
+        }
+
+        $user = $this->getUserByPseudo($pseudo);
+        if (!$user) {
+            throw new ValidationException("Utilisateur introuvable pour Ã©valuer.");
+        }
+
+        $touite = $this->getTouiteById($touiteId);
+        if (!$touite) {
+            throw new ValidationException("Touite introuvable.");
+        }
+
+        $existingRating = $this->hasUserRated($touiteId, $pseudo);
+        if ($existingRating !== null) {
+            if ($existingRating === $valeur) {
+                $label = ($valeur > 0) ? '+1 (J\'aime)' : '-1 (Je n\'aime pas)';
+                throw new ValidationException("Vous avez dÃ©jÃ  votÃ© {$label} pour ce touite. Votre note a bien Ã©tÃ© prise en compte !");
+            }
+            $delta = $valeur - $existingRating;
+            $upd = $this->pdo->prepare("UPDATE EVALUER SET valeur = :val WHERE id_touite = :id_t AND id_user = :id_u");
+            $upd->execute([':val' => $valeur, ':id_t' => $touiteId, ':id_u' => $user->getId()]);
+            $this->pdo->prepare("UPDATE TOUITE SET note = note + :delta WHERE id_touite = :id_t")->execute([':delta' => $delta, ':id_t' => $touiteId]);
+            return ['status' => 'success', 'modified' => true, 'new_score' => $touite->getNote() + $delta];
+        }
+
+        $stmt = $this->pdo->prepare("INSERT INTO EVALUER (id_touite, id_user, valeur) VALUES (:id_t, :id_u, :val)");
+        $stmt->execute([':id_t' => $touiteId, ':id_u' => $user->getId(), ':val' => $valeur]);
+        $this->pdo->prepare("UPDATE TOUITE SET note = note + :val WHERE id_touite = :id_t")->execute([':val' => $valeur, ':id_t' => $touiteId]);
+
+        return ['status' => 'success', 'modified' => false, 'new_score' => $touite->getNote() + $valeur];
+    }
+
+    public function hasUserRated(int $touiteId, string $pseudo): ?int {
+        $user = $this->getUserByPseudo($pseudo);
+        if (!$user) return null;
+        $stmt = $this->pdo->prepare("SELECT valeur FROM EVALUER WHERE id_touite = :id_t AND id_user = :id_u");
+        $stmt->execute([':id_t' => $touiteId, ':id_u' => $user->getId()]);
+        $val = $stmt->fetchColumn();
+        return ($val !== false) ? (int)$val : null;
+    }
 }
