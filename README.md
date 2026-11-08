@@ -25,26 +25,31 @@ Le developpement s'appuie sur une demarche stricte en PHP Objet, sans framework 
 
 ---
 
-## Avancement du projet (Semaine 1 - Base de donnees & Modeles)
+## Bilan de la Semaine 1 (30h PHP & Base de donnees)
 
-Les elements suivants sont mis en place :
+La premiere semaine de developpement backend est achevee. L'ensemble de la logique metier et de la persistance est fonctionnel et valide par tests automatises :
+
 1. **Base de donnees relationnelle** :
-   - Schéma relationnel DDL Oracle Database (`bd/oracle_schema.sql`)
-   - Déclencheurs PL/SQL Oracle (`bd/oracle_triggers.sql`)
-   - Schéma relationnel MySQL / SQLite (`bd/mysql_schema.sql`, `bd/seed_sqlite.sql`)
-   - Données de test riches (`bd/seed_data.sql`)
-   - Rapport de conception relationnelle (`bd/rapport_conception_bd.md`)
-2. **Entites metier** :
-   - `User`, `Touite`, `Tag`, `Image` dans `src/classes/model/`
-3. **Exceptions metier** :
-   - `TouiteurException`, `DatabaseException`, `ValidationException` dans `src/classes/exceptions/`
-4. **Acces aux donnees** :
-   - Fabrique de connexion singleton PDO dans `src/classes/repository/ConnectionFactory.php`
-   - Fichier de configuration dans `config/db.ini`
+   - Schemas relationnels Oracle et MySQL en 3NF/BCNF
+   - Triggers PL/SQL Oracle pour l'integrite et les contraintes metier
+   - Donnees de tests coherentes et realistes
+2. **Couche Metier** :
+   - Entites `User`, `Touite`, `Tag`, `Image` avec assainissement des donnees
+   - Hierarchie des exceptions metier
+3. **Couche Repository (methodes F1 a F15)** :
+   - Consultation des touites et pagination
+   - Filtrage par auteur et par tag
+   - Publication de touite, extraction regex des hashtags et liaisons images
+   - Evaluations (+1/-1) et contrainte stricte d'unicite du vote
+   - Abonnements aux utilisateurs et aux tags, mur personnalise
+   - Espace narcissique (liste des suiveurs, score moyen des publications)
+   - Requetes de rentabilite : classement des influenceurs et tendances des hashtags
+4. **Validation par tests automatises** :
+   - Suite de 20 tests automatisés couvrant l'ensemble des cas nominaux et d'erreur
 
 ---
 
-## Structure actuelle du projet
+## Structure du projet a la fin de la Semaine 1
 
 ```
 SAE_3.1/
@@ -63,18 +68,20 @@ SAE_3.1/
 │   ├── exceptions/
 │   ├── model/
 │   └── repository/
-│       └── ConnectionFactory.php
+│       ├── ConnectionFactory.php
+│       └── TouiteurRepository.php
+├── tests/
+│   └── test_repository.php
 ├── .gitignore
 └── README.md
 ```
 
 ---
 
-## Configuration de la base de donnees
+## Execution des tests automatises
 
-La connexion se configure dans le fichier `config/db.ini` :
-```ini
-driver = sqlite
-database = bd/touiteur.sqlite
+Pour lancer la suite de tests PHP CLI :
+```bash
+php tests/test_repository.php
 ```
-Pour utiliser MySQL ou Oracle, modifier les paramètres correspondants dans `config/db.ini`.
+Tous les tests doivent afficher `[OK]`.
