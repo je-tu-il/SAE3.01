@@ -19,9 +19,9 @@ Touiteur.app est une application web de micromessagerie inspiree de Twitter, dev
 ## Membres de l'equipe
 
 - Jules (Lead dev, architecture et coordination)
-- Anthony Gabillet (@GabilletAnthony)
-- Marin (@MarinFKT)
-- Ilyass Roussi (@IlyassRS3)
+- Anthony (Base de données et Repository)
+- Marin (Back-Office, sécurité et tests)
+- Ilyass (Social, médias et mur)
 
 ---
 
@@ -103,8 +103,10 @@ php -S localhost:8000 -t public
 ```
 
 ### 3. Acceder a l'application
-- Application publique : http://localhost:8000/index.php
-- Back-Office Administrateur : http://localhost:8000/admin.php
+- En ligne sur Webetu : https://webetu.iutnc.univ-lorraine.fr/~e71373u/SAE3.01-main/public/index.php
+- Back-Office sur Webetu : https://webetu.iutnc.univ-lorraine.fr/~e71373u/SAE3.01-main/public/admin.php
+- En local : http://localhost:8000/index.php
+- Back-Office en local : http://localhost:8000/admin.php
 
 ### 4. Lancer les tests automatises
 ```bash
