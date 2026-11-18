@@ -2,7 +2,7 @@
 -- SAE BUT Informatique S3 - IUT Nancy-Charlemagne
 -- Sujet Base de Données 2026 : Touiteur.app
 -- Fichier : mysql_schema.sql
--- Description : Schéma relationnel pour MySQL / MariaDB (Webetu)
+-- Description : Schéma relationnel compatible MySQL / MariaDB (Webetu)
 -- =============================================================================
 
 SET FOREIGN_KEY_CHECKS = 0;
@@ -24,8 +24,7 @@ CREATE TABLE UTILISATEUR (
     prenom           VARCHAR(100) NOT NULL,
     email            VARCHAR(150) NOT NULL UNIQUE,
     nb_touites       INT NOT NULL DEFAULT 0,
-    date_inscription DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT chk_user_nbtouites CHECK (nb_touites >= 0)
+    date_inscription DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 2. Table IMAGE
@@ -46,8 +45,7 @@ CREATE TABLE TOUITE (
     CONSTRAINT fk_touite_auteur FOREIGN KEY (id_auteur) 
         REFERENCES UTILISATEUR(id_user) ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_touite_image FOREIGN KEY (id_image) 
-        REFERENCES IMAGE(id_img) ON DELETE SET NULL ON UPDATE CASCADE,
-    CONSTRAINT chk_touite_taille CHECK (CHAR_LENGTH(texte) <= 235)
+        REFERENCES IMAGE(id_img) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 4. Table TAG
@@ -77,8 +75,7 @@ CREATE TABLE SUIVRE_UTILISATEUR (
     CONSTRAINT fk_suivre_suiveur FOREIGN KEY (id_suiveur) 
         REFERENCES UTILISATEUR(id_user) ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_suivre_suivi FOREIGN KEY (id_suivi) 
-        REFERENCES UTILISATEUR(id_user) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT chk_auto_suivi CHECK (id_suiveur <> id_suivi)
+        REFERENCES UTILISATEUR(id_user) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 7. Table ABONNER_TAG (Abonnements aux tags)
@@ -103,47 +100,5 @@ CREATE TABLE EVALUER_TOUITE (
     CONSTRAINT fk_eval_user FOREIGN KEY (id_user) 
         REFERENCES UTILISATEUR(id_user) ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT fk_eval_touite FOREIGN KEY (id_touite) 
-        REFERENCES TOUITE(id_touite) ON DELETE CASCADE ON UPDATE CASCADE,
-    CONSTRAINT chk_valeur_note CHECK (valeur IN (-1, 1))
+        REFERENCES TOUITE(id_touite) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Triggers MySQL pour mise à jour automatique du compteur de touites
-DELIMITER //
-
-CREATE TRIGGER trg_mysql_inc_touites AFTER INSERT ON TOUITE
-FOR EACH ROW
-BEGIN
-    UPDATE UTILISATEUR SET nb_touites = nb_touites + 1 WHERE id_user = NEW.id_auteur;
-END;
-//
-
-CREATE TRIGGER trg_mysql_dec_touites AFTER DELETE ON TOUITE
-FOR EACH ROW
-BEGIN
-    UPDATE UTILISATEUR SET nb_touites = GREATEST(0, nb_touites - 1) WHERE id_user = OLD.id_auteur;
-END;
-//
-
--- Mise à jour automatique de la note globale du touite lors d'un vote
-CREATE TRIGGER trg_mysql_eval_insert AFTER INSERT ON EVALUER_TOUITE
-FOR EACH ROW
-BEGIN
-    UPDATE TOUITE SET note = note + NEW.valeur WHERE id_touite = NEW.id_touite;
-END;
-//
-
-CREATE TRIGGER trg_mysql_eval_update AFTER UPDATE ON EVALUER_TOUITE
-FOR EACH ROW
-BEGIN
-    UPDATE TOUITE SET note = note - OLD.valeur + NEW.valeur WHERE id_touite = NEW.id_touite;
-END;
-//
-
-CREATE TRIGGER trg_mysql_eval_delete AFTER DELETE ON EVALUER_TOUITE
-FOR EACH ROW
-BEGIN
-    UPDATE TOUITE SET note = note - OLD.valeur WHERE id_touite = OLD.id_touite;
-END;
-//
-
-DELIMITER ;
